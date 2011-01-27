@@ -1,11 +1,45 @@
 <?php
 
+/**
+ * TiGR's Advanced Data Storage
+ * (ignore that silly name)
+ *
+ * v. 1.0 2011.01.03
+ */
+/**
+ * Class tads
+ */
 class tads {
 
+    /**
+     * Path to storage directory
+     * @var string
+     */
     protected $storagePath = "";
+
+    /**
+     * Array holding data file structures.
+     * @var array
+     */
     protected $formats = array();
+
+    /**
+     * Array holding list of filetype/extension associations.
+     * @var array
+     */
     protected $types = array("data" => ".dat", "index" => ".idx", "format" => ".fmt", "lock" => ".lock");
 
+    /**
+     * Files cache as $this->files[$filename][$filetype]
+     * @var array
+     */
+    protected $files = array();
+
+    /**
+     * Constructor.
+     * @param string $storagePath Path to data storage directory
+     * @param int $mode directory mode that would be set for newly created directories
+     */
     public function __construct($storagePath = "", $mode = 0666) {
         if ($storagePath) {
             $this->storagePath = $storagePath
@@ -20,6 +54,12 @@ class tads {
 
     }
 
+    /**
+     * Selects single element from data storage according to file and order id.
+     * @param string $file file (table) name
+     * @param string|int $id element order id
+     * @return array holds selected data row array
+     */
     public function selectByID($file, $id) {
         if (!$this->_idExists($file, $id)) {
             return false;
@@ -33,6 +73,14 @@ class tads {
         return $this->_unpack($file, $data);
     }
 
+    /**
+     * Selects range of elements by start position and number of elements.
+     * @param string $file file (table) name
+     * @param int $offset start position of range
+     * @param int $limit number of elemnts to select
+     * @param string $order specify selection order ASC|DESC
+     * @return array array holding selected rows.
+     */
     public function selectRange($file, $offset, $limit, $order = "ASC") {
         if (strtoupper($order) == "ASC") {
             $id = $offset + 1;
@@ -57,6 +105,12 @@ class tads {
         return $records;
     }
 
+    /**
+     * Insert row.
+     * @param string $file file (table) name
+     * @param array $data data row array
+     * @return int number of rows in table after inserting row
+     */
     public function insert($file, $data) {
         $data = $this->_pack($file, $data);
 
@@ -71,6 +125,13 @@ class tads {
         return $this->count($file);
     }
 
+    /**
+     * Update row
+     * @param string $file file (table) name.
+     * @param int $id row id to update
+     * @param array $data data row array
+     * @return bool success
+     */
     public function update($file, $id, $data) {
         if (!$this->_idOkay($file, $id)) {
             return false;
@@ -92,6 +153,12 @@ class tads {
         return true;
     }
 
+    /**
+     * Delete single element by its id
+     * @param string $file file (table) name
+     * @param int $id row id
+     * @return bool success
+     */
     public function deleteById($file, $id) {
         if (!$this->_idOkay($file, $id)) {
             return false;
@@ -103,6 +170,13 @@ class tads {
         return true;
     }
 
+    /**
+     * Creates new data file (table) according to its structure
+     * @param string $filename file (table) name
+     * @oaram array $format file fields format:
+     *      array(name=>format)
+     *      where format is int|string|anything else
+     */
     public function createFile($filename, $format) {
         $format = array('names' => array_keys($format), 'types' => $format);
         $handle = fopen($this->_getFile($filename, "format"), "w");
@@ -111,11 +185,19 @@ class tads {
         $this->truncate($filename);
     }
 
+    /**
+     * Truncates data file (table) data and index file, keeping structure.
+     * @param string $file filename
+     */
     public function truncate($file) {
         $this->_truncate($file, "data");
         $this->_truncate($file, "index");
     }
 
+    /**
+     * Drops (deletes) data, index and structure files.
+     * @param string $filename file to delete
+     */
     public function dropFile($filename) {
         foreach ($this->types as $type=>$ext) {
             if (file_exists($this->_getFile($filename, $type))) {
@@ -124,12 +206,22 @@ class tads {
         }
     }
 
+    /**
+     * getFileFormat
+     * @oaram string $file file (table) name
+     * @return array data file format array
+     */
     public function getFileFormat($file) {
         return isset($this->formats[$file]) ? $this->formats[$file]
             : $this->formats[$file] =
                 unserialize(file_get_contents($this->_getFile($file, "format")));
     }
 
+    /**
+     * Return number of rows in file (table)
+     * @param string $file file (table) name
+     * @return int number of rows
+     */
     public function count($file) {
         $count = floor(filesize($this->_getFile($file, "index")) / 4);
         return $count;
@@ -201,12 +293,17 @@ class tads {
     }
 
     protected function _getFile($file, $type = "data") {
-        $filename = $this->storagePath . basename($file) . $this->types[$type];
-        if ($type == "index" and !file_exists($filename)) {
-            touch($filename);
-            $this->_refreshIndex($file);
+        if (!isset($this->files[$file][$type])) {
+            $this->files[$file][$type] = $this->storagePath . basename($file) . $this->types[$type];
+            if ($type == "index" and !file_exists($this->files[$file][$type])) {
+                if (!touch($this->files[$file][$type])) {
+                    trigger_error("Can't create '$file.idx', permissions problem?",
+                        E_USER_ERROR);
+                }
+                $this->_refreshIndex($file);
+            }
         }
-        return $filename;
+        return $this->files[$file][$type];
     }
 
     protected function _pack($file, $data) {
