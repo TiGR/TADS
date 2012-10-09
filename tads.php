@@ -179,7 +179,7 @@ class tads {
      */
     public function createFile($filename, $format) {
         $format = array('names' => array_keys($format), 'types' => $format);
-        $handle = fopen($this->_getFile($filename, "format"), "w");
+        $handle = fopen($this->_getFile($filename, "format", true), "w");
         fwrite($handle, serialize($format));
         fclose($handle);
         $this->truncate($filename);
@@ -284,23 +284,32 @@ class tads {
 
     protected function _idExists($file, $id) {
         if ($id > $this->count($file) or $id < 1) {
-            trigger_error("TADS: bad record ID [" . intval($id)
-                . "]. Maximum is " . $this->count($file),
-                E_USER_WARNING);
-            return false;
+            throw new Exception("TADS: bad record ID [" . intval($id)
+                . "]. Maximum is " . $this->count($file));
         }
         return true;
     }
 
-    protected function _getFile($file, $type = "data") {
+    protected function _getFile($file, $type = "data", $ignoreErrors = false) {
         if (!isset($this->files[$file][$type])) {
             $this->files[$file][$type] = $this->storagePath . basename($file) . $this->types[$type];
-            if ($type == "index" and !file_exists($this->files[$file][$type])) {
-                if (!touch($this->files[$file][$type])) {
-                    trigger_error("Can't create '$file.idx', permissions problem?",
-                        E_USER_ERROR);
+            if (!file_exists($this->files[$file][$type])) {
+                switch($type) {
+                    case "data":
+                    case "index":
+                        if (!touch($this->files[$file][$type])) {
+                            throw new Exception("Can't create $type file '$file', "
+                                . "permissions problem?");
+                        }
+                        $this->_refreshIndex($file);
+                        break;
+                    
+                    case "format":
+                        if (!$ignoreErrors) {
+                            throw new Exception("File '$file.fmt' does not exist.");
+                        }
+                        break;
                 }
-                $this->_refreshIndex($file);
             }
         }
         return $this->files[$file][$type];
