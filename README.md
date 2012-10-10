@@ -1,8 +1,8 @@
-TiGR's Advanced Data Storage
+# TiGR's Advanced Data Storage
 
- - Consider checkup of idxfile being up-to-date (by comparing mdates of .dat and .idx).
+Stupid name for a simple (and stupid) data storage engine. Kinda NoSQL solution started somewhere around 2005.
 
-Limits:
+## Limits
 
  - Overhead: minimum 1 byte for most fields.
  - Maximum table size: 4 Gb.
@@ -10,27 +10,31 @@ Limits:
  - Index is number of records * 4 bytes long.
  - Maximum data record length: 1 Mb (specified in _refreshIndex).
 
-Initial release:
+## Initial release
 
- v index ONLY for speedup.
- v ID is # of record.
- v select single, select range, insert.
- v update.single
- v delete single.
- v refresh index.
+ - index ONLY for speedup.
+ - ID is the number of record.
+ - select single, select range, insert.
+ - update ssingle
+ - delete single.
+ - refresh index.
 
-Further releases:
+## Further releases
 
- v delete all from table.
- v drop table.
+ - delete all from table.
+ - drop table.
+
+## todo
+
  - mass delete (offset, limit).
  - unique ID - deletion of record should not affect IDs of other records
     (possibly, requires wrapping data into array - null value instead of array
     would mean that record was deleted. Do we need this?!!
     Indexes should contain UID. Each data row also.).
  - file locking, backuping.
+ - Consider checkup of idxfile being up-to-date (by comparing mdates of .dat and .idx).
 
-Already done:
+## Already done
 
  - storing keys and data together.
  - index ONLY for speedup.
